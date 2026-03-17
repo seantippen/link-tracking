@@ -807,44 +807,133 @@ function renderHourly() {
 }
 
 // Geography
+let geoJsonLayer = null;
+let geoJsonData = null;
+
+// Load GeoJSON boundaries once
+async function loadGeoJSON() {
+  if (geoJsonData) return geoJsonData;
+  try {
+    const res = await fetch('greenville-zips.geojson');
+    geoJsonData = await res.json();
+  } catch (e) { geoJsonData = null; }
+  return geoJsonData;
+}
+
 function renderGeo() {
   // Map
   if (!map) {
     map = L.map('map', {
       zoomControl: true,
       attributionControl: false
-    }).setView([34.85, -82.39], 10);
+    }).setView([34.85, -82.39], 11);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19
     }).addTo(map);
+    // Load and render zip boundaries
+    loadGeoJSON().then(gj => renderZipBoundaries(gj));
   }
 
   mapMarkers.forEach(m => map.removeLayer(m));
   mapMarkers = [];
 
-  if (data.geo && data.geo.length > 0) {
-    const bounds = [];
-    data.geo.forEach(g => {
-      if (!g.lat || !g.lon) return;
-      const marker = L.circleMarker([g.lat, g.lon], {
-        radius: Math.min(6 + g.count * 3, 30),
-        color: '#22c55e',
-        fillColor: '#22c55e',
-        fillOpacity: 0.4,
-        weight: 2
-      }).addTo(map);
-      marker.bindPopup(`<strong>${g.city}, ${g.region}</strong><br>${g.count} scan${g.count !== 1 ? 's' : ''}`);
-      mapMarkers.push(marker);
-      bounds.push([g.lat, g.lon]);
-    });
-    if (bounds.length > 0) {
-      if (bounds.length === 1) {
-        map.setView(bounds[0], 11);
-      } else {
-        map.fitBounds(bounds, { padding: [40, 40] });
-      }
+  // Build lat/lon lookup from geo aggregates
+  const geoLookup = {};
+  (data.geo || []).forEach(g => {
+    if (g.lat && g.lon) geoLookup[g.city + '|' + g.region] = { lat: g.lat, lon: g.lon };
+  });
+
+  // Plot individual scan dots from recent array
+  const bounds = [];
+  const scansByLocation = {};
+  (data.recent || []).forEach((s, i) => {
+    const key = (s.city || 'Unknown') + '|' + (s.region || '');
+    const coords = geoLookup[key];
+    if (!coords) return;
+
+    // Count scans at this location for jitter spread
+    if (!scansByLocation[key]) scansByLocation[key] = 0;
+    scansByLocation[key]++;
+    const idx = scansByLocation[key];
+
+    // Jitter: spiral pattern so dots fan out from center
+    const angle = idx * 2.4; // golden angle
+    const dist = 0.002 * Math.sqrt(idx); // spread increases with count
+    const lat = coords.lat + dist * Math.cos(angle);
+    const lon = coords.lon + dist * Math.sin(angle);
+
+    const slugColor = COLORS[
+      [...new Set(data.recent.map(r => r.slug))].indexOf(s.slug) % COLORS.length
+    ];
+
+    const marker = L.circleMarker([lat, lon], {
+      radius: 5,
+      color: slugColor,
+      fillColor: slugColor,
+      fillOpacity: 0.7,
+      weight: 1.5
+    }).addTo(map);
+
+    const device = parseUA(s.ua);
+    marker.bindPopup(
+      `<strong style="color:${slugColor}">${s.slug}</strong><br>` +
+      `${s.city || 'Unknown'}${s.region ? ', ' + s.region : ''}<br>` +
+      `<span style="opacity:0.7">${device}</span><br>` +
+      `<span style="opacity:0.5">${timeAgo(s.ts)}</span>`
+    );
+    mapMarkers.push(marker);
+    bounds.push([lat, lon]);
+  });
+
+  if (bounds.length > 0) {
+    if (bounds.length === 1) {
+      map.setView(bounds[0], 12);
+    } else {
+      map.fitBounds(bounds, { padding: [40, 40] });
     }
   }
+
+  // Re-color zip boundaries based on scan data
+  renderZipBoundaries(geoJsonData);
+
+}
+
+function renderZipBoundaries(gj) {
+  if (!gj || !map) return;
+  if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+
+  // Build zip scan counts
+  const zipCounts = {};
+  (data && data.zips || []).forEach(z => { zipCounts[z.postal_code] = z.count; });
+  const maxCount = Math.max(1, ...Object.values(zipCounts));
+
+  geoJsonLayer = L.geoJSON(gj, {
+    style: function(feature) {
+      const zip = feature.properties.ZCTA5CE20 || feature.properties.ZCTA5CE10 || feature.properties.zip;
+      const count = zipCounts[zip] || 0;
+      if (count === 0) {
+        return { fillOpacity: 0.02, weight: 1, color: 'rgba(255,255,255,0.15)', opacity: 0.3, fillColor: '#fff' };
+      }
+      const intensity = Math.min(count / maxCount, 1);
+      return {
+        fillColor: '#22c55e',
+        fillOpacity: 0.08 + intensity * 0.35,
+        weight: 1.5,
+        color: '#22c55e',
+        opacity: 0.4 + intensity * 0.4
+      };
+    },
+    onEachFeature: function(feature, layer) {
+      const zip = feature.properties.ZCTA5CE20 || feature.properties.ZCTA5CE10 || feature.properties.zip;
+      const count = zipCounts[zip] || 0;
+      if (count > 0) {
+        layer.bindTooltip(`<strong>${zip}</strong><br>${count} scan${count !== 1 ? 's' : ''}`, { sticky: true });
+      }
+    }
+  }).addTo(map);
+
+  // Ensure scan dots render on top of boundaries
+  mapMarkers.forEach(m => m.bringToFront());
 
   // Cities table
   document.getElementById('geo-cities-table').innerHTML = data.geo && data.geo.length > 0
