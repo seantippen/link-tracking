@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How It Works | QR Link Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-base: #0a0d12;
+    --bg-surface: #111827;
+    --bg-surface-hover: #1f2937;
+    --border: rgba(255,255,255,0.06);
+    --border-bright: rgba(255,255,255,0.12);
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --accent-green: #22c55e;
+    --accent-blue: #3b82f6;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --accent-green-glow: rgba(34,197,94,0.15);
+    --accent-blue-glow: rgba(59,130,246,0.15);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.65;
+  }
+
+  /* Dot grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Aurora gradient */
+  .aurora {
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 500px;
+    background: radial-gradient(ellipse at 30% 50%, rgba(34,197,94,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 50%, rgba(59,130,246,0.08) 0%, transparent 60%);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(10,13,18,0.85);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+
+  .header-inner {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-title { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  .header-title span { color: var(--accent-green); }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-right a {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+  .header-right a:hover { color: var(--text-primary); background: var(--bg-surface); }
+  .header-right a.active { color: var(--accent-green); background: var(--accent-green-glow); }
+
+  /* Main content */
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+  .hero h1 {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+  }
+  .hero h1 .green { color: var(--accent-green); }
+  .hero h1 .blue { color: var(--accent-blue); }
+  .hero p {
+    font-size: 18px;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 56px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-green);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .section h2 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    line-height: 1.25;
+  }
+  .section > p {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-bottom: 24px;
+    max-width: 700px;
+  }
+
+  /* Architecture diagram */
+  .arch-flow {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    align-items: center;
+    gap: 0;
+    margin: 32px 0 40px;
+    overflow-x: auto;
+  }
+  .arch-node {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    text-align: center;
+    transition: border-color 0.15s;
+    min-width: 160px;
+  }
+  .arch-node:hover { border-color: var(--border-bright); }
+  .arch-node .node-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .arch-node .node-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .arch-node .node-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .arch-node.highlight {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 24px rgba(34,197,94,0.08);
+  }
+  .arch-arrow {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 22px;
+    padding: 0 4px;
+    user-select: none;
+  }
+
+  /* Detail cards */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .detail-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: border-color 0.15s;
+  }
+  .detail-card:hover { border-color: var(--border-bright); }
+  .detail-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .detail-card h3 .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .detail-card p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .detail-card.full-width {
+    grid-column: 1 / -1;
+  }
+
+  /* Code block */
+  .code-block {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+  .code-block pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    white-space: pre;
+  }
+  .code-block .comment { color: var(--text-muted); }
+  .code-block .keyword { color: var(--accent-purple); }
+  .code-block .string { color: var(--accent-green); }
+  .code-block .fn { color: var(--accent-blue); }
+  .code-block .number { color: var(--accent-amber); }
+
+  /* Data fields table */
+  .fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+  .fields-table th {
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-bright);
+  }
+  .fields-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .fields-table tr:hover td { background: var(--bg-surface-hover); }
+  .fields-table .field-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+  .fields-table .source-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .source-edge {
+    background: var(--accent-green-glow);
+    color: var(--accent-green);
+  }
+  .source-header {
+    background: var(--accent-blue-glow);
+    color: var(--accent-blue);
+  }
+  .source-system {
+    background: rgba(139,92,246,0.15);
+    color: var(--accent-purple);
+  }
+
+  /* Stack list */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .stack-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    transition: border-color 0.15s;
+  }
+  .stack-item:hover { border-color: var(--border-bright); }
+  .stack-item .stack-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .stack-item .stack-role {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Sequence diagram (simplified) */
+  .sequence {
+    margin: 32px 0;
+    padding: 0;
+    list-style: none;
+    position: relative;
+  }
+  .sequence::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 19px;
+    width: 2px;
+    background: var(--border-bright);
+  }
+  .sequence li {
+    position: relative;
+    padding: 0 0 28px 52px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .sequence li:last-child { padding-bottom: 0; }
+  .sequence li::before {
+    content: attr(data-step);
+    position: absolute;
+    left: 6px;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 2px solid var(--accent-green);
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    text-align: center;
+  }
+  .sequence li strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .sequence li code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--bg-surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent-green);
+  }
+
+  /* Key decisions */
+  .decision-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+    transition: border-color 0.15s;
+  }
+  .decision-card:hover { border-color: var(--border-bright); }
+  .decision-card .q {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent-amber);
+    margin-bottom: 8px;
+  }
+  .decision-card .a {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  /* Footer */
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 32px 24px 48px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  footer a {
+    color: var(--accent-green);
+    text-decoration: none;
+  }
+  footer a:hover { text-decoration: underline; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 28px; }
+    .hero p { font-size: 16px; }
+    .arch-flow {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .arch-arrow { transform: rotate(90deg); padding: 8px 0; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .stack-grid { grid-template-columns: 1fr 1fr; }
+    main { padding: 32px 16px 60px; }
+    .section h2 { font-size: 22px; }
+  }
+  @media (max-width: 480px) {
+    .stack-grid { grid-template-columns: 1fr; }
+    .fields-table { font-size: 12px; }
+    .fields-table td, .fields-table th { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-title"><span>QR</span> Link Tracking</div>
+    </div>
+    <div class="header-right">
+      <a href="index.html">Dashboard</a>
+      <a href="about.html" class="active">How It Works</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Every scan tells a <span class="green">story</span>.<br>Here's how we <span class="blue">capture</span> it.</h1>
+    <p>A zero-infrastructure tracking system that turns printed QR codes into rich analytics &mdash; city, zip code, device, and timestamp &mdash; without any client-side scripts or cookies.</p>
+  </div>
+
+  <!-- Architecture overview -->
+  <div class="section">
+    <div class="section-label">Architecture</div>
+    <h2>Three layers, two domains</h2>
+    <p>The system splits redirect logic, data storage, and visualization across Cloudflare's edge network and GitHub Pages.</p>
+
+    <div class="arch-flow">
+      <div class="arch-node">
+        <span class="node-icon">&#x1F4F1;</span>
+        <div class="node-title">QR Scan</div>
+        <div class="node-sub">user's phone</div>
+      </div>
+      <div class="arch-arrow">&rarr;</div>
+      <div class="arch-node highlight">
+        <span class="node-icon">&#x26A1;</span>
+        <div class="node-title">Edge Function</div>
+        <div class="node-sub">greenvilletriumph.club</div>
+      </div>
+      <div class="arch-arrow">&rarr;</div>
+      <div class="arch-node">
+        <span class="node-icon">&#x1F3AB;</span>
+        <div class="node-title">Ticket Page</div>
+        <div class="node-sub">vivenu.com + UTMs</div>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h3><span class="dot" style="background:var(--accent-green)"></span> Redirect Layer</h3>
+        <p>A Cloudflare Pages Function at <code>/go/{slug}</code> looks up the destination URL, appends UTM parameters for attribution, logs the scan to D1, and returns a 302 redirect. The entire round-trip happens at the edge &mdash; no origin server.</p>
+      </div>
+      <div class="detail-card">
+        <h3><span class="dot" style="background:var(--accent-blue)"></span> API Layer</h3>
+        <p>Two serverless endpoints: <code>/api/scans</code> returns aggregated analytics (totals, daily breakdown, geo, zip codes) and <code>/api/destinations</code> provides CRUD for managing links. Mutations require an admin key.</p>
+      </div>
+      <div class="detail-card">
+        <h3><span class="dot" style="background:var(--accent-amber)"></span> Database</h3>
+        <p>Cloudflare D1 (SQLite at the edge) stores two tables: <strong>destinations</strong> maps slugs to URLs, and <strong>scans</strong> records one row per scan with 12 data fields. SQL enables aggregation queries that KV storage can't handle.</p>
+      </div>
+      <div class="detail-card">
+        <h3><span class="dot" style="background:var(--accent-purple)"></span> Dashboard</h3>
+        <p>A static HTML page on GitHub Pages fetches live data cross-origin from the .club API. Chart.js renders charts, Leaflet renders the map with GeoJSON zip code boundaries. Auto-refreshes every 60 seconds.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- What happens when you scan -->
+  <div class="section">
+    <div class="section-label">Sequence</div>
+    <h2>What happens when someone scans a QR code</h2>
+    <p>From phone camera to ticket page in under 100ms. Here's every step.</p>
+
+    <ol class="sequence">
+      <li data-step="1"><strong>Phone camera reads the QR code</strong>, which encodes a URL like <code>greenvilletriumph.club/go/stadium</code></li>
+      <li data-step="2"><strong>Request hits Cloudflare's edge</strong> at the nearest data center. The <code>request.cf</code> object is automatically populated with the scanner's city, state, country, lat/lon, zip code, timezone, and ISP.</li>
+      <li data-step="3"><strong>Function looks up the slug</strong> in the D1 <code>destinations</code> table. If the slug exists and is active, it gets the destination URL. If not, it falls back to a default Vivenu seller page.</li>
+      <li data-step="4"><strong>UTM parameters are appended</strong> to the destination URL: <code>utm_source=qr</code>, <code>utm_medium=print</code>, <code>utm_content={slug}</code>. This makes every QR scan attributable in Vivenu and HubSpot.</li>
+      <li data-step="5"><strong>Scan is logged non-blocking</strong> via <code>waitUntil()</code>. The database INSERT happens in the background &mdash; the user never waits for it. If the write fails, the redirect still succeeds.</li>
+      <li data-step="6"><strong>302 redirect fires</strong>. The user's phone opens the ticket page with UTM tags intact. Total time from scan to redirect: typically &lt;50ms.</li>
+    </ol>
+  </div>
+
+  <!-- Data captured -->
+  <div class="section">
+    <div class="section-label">Data Model</div>
+    <h2>What's captured on every scan</h2>
+    <p>12 fields are logged per scan. No cookies, no JavaScript on the user's device, no tracking pixels. All data comes from Cloudflare's edge network and HTTP headers.</p>
+
+    <div class="code-block">
+      <pre><span class="comment">-- One row per scan</span>
+<span class="keyword">INSERT INTO</span> scans (
+  slug, ts, city, region, country,
+  lat, lon, ua, referer,
+  timezone, postal_code, as_org
+) <span class="keyword">VALUES</span> (
+  <span class="string">'stadium'</span>,           <span class="comment">-- which QR code</span>
+  <span class="string">'2026-03-22T14:32:01Z'</span>, <span class="comment">-- when</span>
+  <span class="string">'Greenville'</span>,         <span class="comment">-- where (city)</span>
+  <span class="string">'South Carolina'</span>,     <span class="comment">-- where (state)</span>
+  <span class="string">'US'</span>,                 <span class="comment">-- where (country)</span>
+  <span class="number">34.8526</span>, <span class="number">-82.3940</span>,     <span class="comment">-- coordinates</span>
+  <span class="string">'Mozilla/5.0 ...'</span>,    <span class="comment">-- device info</span>
+  <span class="keyword">null</span>,                  <span class="comment">-- referrer (usually null for QR)</span>
+  <span class="string">'America/New_York'</span>,   <span class="comment">-- timezone</span>
+  <span class="string">'29601'</span>,              <span class="comment">-- zip code</span>
+  <span class="string">'Charter Comms'</span>       <span class="comment">-- ISP / network</span>
+);</pre>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="fields-table">
+        <thead>
+          <tr><th>Field</th><th>Source</th><th>What It Tells You</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="field-name">slug</td>
+            <td><span class="source-badge source-system">URL path</span></td>
+            <td>Which QR code / table topper was scanned</td>
+          </tr>
+          <tr>
+            <td class="field-name">ts</td>
+            <td><span class="source-badge source-system">server clock</span></td>
+            <td>When the scan happened (UTC ISO 8601)</td>
+          </tr>
+          <tr>
+            <td class="field-name">city</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>Scanner's city (IP geolocation)</td>
+          </tr>
+          <tr>
+            <td class="field-name">region</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>State or province</td>
+          </tr>
+          <tr>
+            <td class="field-name">country</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>Two-letter country code</td>
+          </tr>
+          <tr>
+            <td class="field-name">lat / lon</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>Approximate coordinates for map plotting</td>
+          </tr>
+          <tr>
+            <td class="field-name">ua</td>
+            <td><span class="source-badge source-header">HTTP header</span></td>
+            <td>Device and browser (iPhone/Android, Chrome/Safari)</td>
+          </tr>
+          <tr>
+            <td class="field-name">referer</td>
+            <td><span class="source-badge source-header">HTTP header</span></td>
+            <td>Where the click came from (usually null for QR scans)</td>
+          </tr>
+          <tr>
+            <td class="field-name">timezone</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>IANA timezone of the scanner</td>
+          </tr>
+          <tr>
+            <td class="field-name">postal_code</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>Zip code &mdash; enables neighborhood-level analysis</td>
+          </tr>
+          <tr>
+            <td class="field-name">as_org</td>
+            <td><span class="source-badge source-edge">CF edge</span></td>
+            <td>ISP or network operator (e.g., Verizon, Charter, Spectrum)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Key design decisions -->
+  <div class="section">
+    <div class="section-label">Design Decisions</div>
+    <h2>Why it's built this way</h2>
+
+    <div class="decision-card">
+      <div class="q">Why Cloudflare instead of a custom server?</div>
+      <div class="a">The domain is already on Cloudflare. Pages Functions run at the edge with zero cold start, D1 is free at this volume, and <code>request.cf</code> provides geo data automatically. There's no server to provision, patch, or scale. The entire backend is 3 JavaScript files.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="q">Why redirect URLs instead of linking directly to ticket pages?</div>
+      <div class="a">Three reasons: <strong>(1)</strong> destinations can be changed without reprinting QR codes, <strong>(2)</strong> every scan is logged with full geo data, <strong>(3)</strong> UTM parameters are appended automatically so ticket purchases are attributable back to specific QR placements.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="q">Why D1 (SQL) instead of KV (key-value)?</div>
+      <div class="a">Scan data is relational. The dashboard needs <code>GROUP BY slug</code>, date range filters, geographic aggregation, and zip code breakdowns. SQL handles these natively. With KV, you'd have to read all records into memory and aggregate in JavaScript &mdash; slow and expensive at scale.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="q">Why <code>waitUntil()</code> instead of <code>await</code> for the INSERT?</div>
+      <div class="a">The user scanning a QR code should never wait for a database write. <code>waitUntil()</code> lets the 302 redirect return immediately while the INSERT continues in the background. If D1 is slow or the write fails, the redirect still works. Analytics are best-effort; redirects are critical path.</div>
+    </div>
+
+    <div class="decision-card">
+      <div class="q">Why is the dashboard on GitHub Pages instead of Cloudflare?</div>
+      <div class="a">Separation of concerns. The .club domain handles only redirects and API &mdash; keeping it lean minimizes risk of breaking QR redirects. The dashboard is a static HTML file that fetches data cross-origin, so it can live anywhere. GitHub Pages gives free hosting with git-push deploys.</div>
+    </div>
+  </div>
+
+  <!-- Tech stack -->
+  <div class="section">
+    <div class="section-label">Stack</div>
+    <h2>Technology</h2>
+
+    <div class="stack-grid">
+      <div class="stack-item">
+        <div class="stack-name">Cloudflare Pages</div>
+        <div class="stack-role">Hosting + edge functions</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-name">Cloudflare D1</div>
+        <div class="stack-role">SQLite database at the edge</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-name">Chart.js 4.4.7</div>
+        <div class="stack-role">Charts + data visualization</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-name">Leaflet 1.9.4</div>
+        <div class="stack-role">Interactive map + GeoJSON</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-name">GitHub Pages</div>
+        <div class="stack-role">Dashboard hosting</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-name">Vanilla JS</div>
+        <div class="stack-role">Zero build step, no frameworks</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Built by <a href="https://seantippen.com">Sean Tippen</a> &middot; Tracking QR scans for <a href="https://greenvilletriumph.com">Greenville Triumph SC</a>
+</footer>
+</body>
+</html>
