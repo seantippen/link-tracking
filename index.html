@@ -405,6 +405,40 @@
     font-weight: 500;
   }
 
+  /* Filter banner */
+  .filter-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--accent-green-glow);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .filter-banner .filter-label {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+  .filter-banner .filter-label span {
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .filter-banner a {
+    color: var(--accent-blue);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .filter-banner a:hover { text-decoration: underline; }
+
+  .slug-badge-link {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .slug-badge-link:hover { opacity: 0.8; }
+
   /* Responsive */
   @media (max-width: 768px) {
     .chart-row { grid-template-columns: 1fr; }
@@ -445,6 +479,10 @@
 </header>
 
 <main>
+  <div class="filter-banner" id="filter-banner" style="display:none">
+    <div class="filter-label">Filtering: <span id="filter-slug-name"></span></div>
+    <a href="?" id="filter-clear">View All Campaigns</a>
+  </div>
   <div class="controls-bar">
     <div></div>
     <div class="period-selector" id="period-selector">
@@ -532,6 +570,31 @@ let charts = {};
 let map = null;
 let mapMarkers = [];
 
+// Campaign filter from URL
+const urlParams = new URLSearchParams(window.location.search);
+const filterSlug = urlParams.get('slug');
+
+function applySlugFilter(raw) {
+  if (!filterSlug) return raw;
+  // Show banner
+  const destMap = {};
+  (raw.destinations || []).forEach(d => destMap[d.slug] = d.label);
+  const label = destMap[filterSlug] || filterSlug;
+  document.getElementById('filter-banner').style.display = 'flex';
+  document.getElementById('filter-slug-name').textContent = label;
+  document.title = label + ' | QR Scan Analytics';
+  // Filter all data arrays to this slug
+  return {
+    ...raw,
+    summary: raw.summary.filter(s => s.slug === filterSlug),
+    daily: raw.daily.filter(d => d.slug === filterSlug),
+    recent: raw.recent.filter(r => r.slug === filterSlug),
+    geo: raw.geo, // geo is aggregated across slugs by the API, keep as-is
+    zips: raw.zips, // same — no slug field
+    destinations: raw.destinations.filter(d => d.slug === filterSlug)
+  };
+}
+
 // Chart.js defaults
 Chart.defaults.color = '#9ca3af';
 Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
@@ -572,7 +635,7 @@ async function loadData() {
   try {
     const url = currentDays > 0 ? `${API_BASE}?days=${currentDays}` : API_BASE;
     const res = await fetch(url);
-    data = await res.json();
+    data = applySlugFilter(await res.json());
     renderAll();
     document.getElementById('last-updated').textContent =
       'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -985,7 +1048,7 @@ function renderLinks() {
         ${(data.destinations || []).map(d => {
           const stats = destMap[d.slug];
           return `<tr>
-            <td><span class="slug-badge">${d.slug}</span></td>
+            <td><a href="?slug=${encodeURIComponent(d.slug)}" class="slug-badge slug-badge-link" style="text-decoration:none">${d.slug}</a></td>
             <td>${d.label || ''}</td>
             <td><a href="${d.url}" target="_blank" class="link-url">${d.url}</a></td>
             <td><span class="${d.active ? 'status-active' : 'status-inactive'}">${d.active ? 'Active' : 'Inactive'}</span></td>
