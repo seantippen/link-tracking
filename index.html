@@ -405,33 +405,28 @@
     font-weight: 500;
   }
 
-  /* Filter banner */
-  .filter-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background: var(--accent-green-glow);
-    border: 1px solid rgba(34,197,94,0.25);
-    border-radius: var(--radius-sm);
-    margin-bottom: 16px;
-    font-size: 13px;
-  }
-  .filter-banner .filter-label {
+  /* Campaign selector */
+  .campaign-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     color: var(--text-primary);
-    font-weight: 500;
-  }
-  .filter-banner .filter-label span {
-    color: var(--accent-green);
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .filter-banner a {
-    color: var(--accent-blue);
-    text-decoration: none;
+    padding: 6px 28px 6px 10px;
+    border-radius: var(--radius-sm);
     font-size: 12px;
+    font-family: 'Inter', sans-serif;
     font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    min-width: 140px;
   }
-  .filter-banner a:hover { text-decoration: underline; }
+  .campaign-select:hover { border-color: var(--border-bright); }
+  .campaign-select:focus { outline: none; border-color: var(--accent-green); }
+  .campaign-select option { background: var(--bg-surface); color: var(--text-primary); }
 
   .slug-badge-link {
     cursor: pointer;
@@ -479,12 +474,10 @@
 </header>
 
 <main>
-  <div class="filter-banner" id="filter-banner" style="display:none">
-    <div class="filter-label">Filtering: <span id="filter-slug-name"></span></div>
-    <a href="?" id="filter-clear">View All Campaigns</a>
-  </div>
   <div class="controls-bar">
-    <div></div>
+    <select class="campaign-select" id="campaign-select">
+      <option value="">All Campaigns</option>
+    </select>
     <div class="period-selector" id="period-selector">
       <button class="period-btn" data-days="7">7d</button>
       <button class="period-btn active" data-days="30">30d</button>
@@ -570,27 +563,48 @@ let charts = {};
 let map = null;
 let mapMarkers = [];
 
-// Campaign filter from URL
-const urlParams = new URLSearchParams(window.location.search);
-const filterSlug = urlParams.get('slug');
+// Campaign filter
+let rawData = null; // unfiltered API response
+let filterSlug = new URLSearchParams(window.location.search).get('slug') || '';
+
+function populateCampaignSelect() {
+  const sel = document.getElementById('campaign-select');
+  const current = sel.value;
+  const opts = ['<option value="">All Campaigns</option>'];
+  (rawData.destinations || []).forEach(d => {
+    const selected = d.slug === filterSlug ? ' selected' : '';
+    opts.push(`<option value="${d.slug}"${selected}>${d.label || d.slug}</option>`);
+  });
+  sel.innerHTML = opts.join('');
+}
+
+document.getElementById('campaign-select').addEventListener('change', function() {
+  filterSlug = this.value;
+  // Update URL without reload
+  const url = new URL(window.location);
+  if (filterSlug) url.searchParams.set('slug', filterSlug);
+  else url.searchParams.delete('slug');
+  history.replaceState(null, '', url);
+  // Re-filter and render
+  data = applySlugFilter(rawData);
+  renderAll();
+});
 
 function applySlugFilter(raw) {
-  if (!filterSlug) return raw;
-  // Show banner
+  if (!filterSlug) {
+    document.title = 'Link Tracking | QR Scan Analytics';
+    return raw;
+  }
   const destMap = {};
   (raw.destinations || []).forEach(d => destMap[d.slug] = d.label);
-  const label = destMap[filterSlug] || filterSlug;
-  document.getElementById('filter-banner').style.display = 'flex';
-  document.getElementById('filter-slug-name').textContent = label;
-  document.title = label + ' | QR Scan Analytics';
-  // Filter all data arrays to this slug
+  document.title = (destMap[filterSlug] || filterSlug) + ' | QR Scan Analytics';
   return {
     ...raw,
     summary: raw.summary.filter(s => s.slug === filterSlug),
     daily: raw.daily.filter(d => d.slug === filterSlug),
     recent: raw.recent.filter(r => r.slug === filterSlug),
-    geo: raw.geo, // geo is aggregated across slugs by the API, keep as-is
-    zips: raw.zips, // same — no slug field
+    geo: raw.geo,
+    zips: raw.zips,
     destinations: raw.destinations.filter(d => d.slug === filterSlug)
   };
 }
@@ -635,7 +649,9 @@ async function loadData() {
   try {
     const url = currentDays > 0 ? `${API_BASE}?days=${currentDays}` : API_BASE;
     const res = await fetch(url);
-    data = applySlugFilter(await res.json());
+    rawData = await res.json();
+    populateCampaignSelect();
+    data = applySlugFilter(rawData);
     renderAll();
     document.getElementById('last-updated').textContent =
       'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

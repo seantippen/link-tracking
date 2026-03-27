@@ -3,7 +3,7 @@
 ## Project
 GitHub Pages dashboard for the greenvilletriumph.club QR link tracking system. Fetches live scan data from the `/api/scans` endpoint and visualizes it with Chart.js + Leaflet.
 
-- **Dashboard URL**: https://seantippen.github.io/link-tracking/
+- **Dashboard URL**: https://linktracking.seantippen.com/
 - **Data source**: https://greenvilletriumph.club/api/scans?days=30
 - **Backend code**: `Triumph dot Club/` (Cloudflare Pages + D1)
 - **GitHub repo**: https://github.com/seantippen/link-tracking
