@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="dark">
 <title>Link Tracking | QR Scan Analytics</title>
+<link rel="stylesheet" href="https://design.seantippen.com/tokens.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -16,52 +17,7 @@
 
 @layer reset { *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; } }
 
-@layer tokens {
-  :root {
-    color-scheme: dark;
-    --color-accent: oklch(0.75 0.17 178);
-    --color-secondary: oklch(0.74 0.18 30);
-    --color-bg: oklch(0.14 0.025 250);
-    --color-surface: oklch(0.18 0.025 250);
-    --color-surface-hover: oklch(0.22 0.025 250);
-    --color-surface-raised: oklch(0.26 0.025 250);
-    --color-text: oklch(0.93 0.01 250);
-    --color-text-secondary: oklch(0.75 0.01 250);
-    --color-text-muted: oklch(0.55 0.015 250);
-    --color-text-disabled: oklch(0.40 0.01 250);
-    --color-border: oklch(1 0 0 / 0.08);
-    --color-border-emphasis: oklch(1 0 0 / 0.15);
-    --color-border-strong: oklch(1 0 0 / 0.25);
-    --accent-muted: oklch(0.87 0.17 178 / 0.15);
-    --accent-subtle: oklch(0.87 0.17 178 / 0.08);
-    --color-success: oklch(0.72 0.17 145);
-    --color-warning: oklch(0.80 0.16 85);
-    --color-danger: oklch(0.70 0.19 25);
-    --color-info: oklch(0.72 0.14 230);
-    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3);
-    --shadow-md: 0 4px 12px oklch(0 0 0 / 0.4);
-    --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.5);
-    --green: #4CC97A; --blue: #6BA3FF; --red: #F28878; --amber: #D4AD42;
-    --purple: #C688E0; --cyan: #4BC3CA; --yellow: #E8D44D; --orange: #E89B4D;
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-    --text-xs: clamp(0.6875rem, 0.625rem + 0.25vw, 0.8125rem);
-    --text-sm: clamp(0.8125rem, 0.75rem + 0.25vw, 0.9375rem);
-    --text-base: clamp(0.9375rem, 0.875rem + 0.25vw, 1.0625rem);
-    --text-lg: clamp(1.125rem, 1rem + 0.5vw, 1.375rem);
-    --text-xl: clamp(1.375rem, 1.125rem + 1vw, 1.875rem);
-    --text-2xl: clamp(1.75rem, 1.375rem + 1.5vw, 2.625rem);
-    --space-xs: clamp(0.25rem, 0.2rem + 0.2vw, 0.5rem);
-    --space-sm: clamp(0.5rem, 0.4rem + 0.4vw, 0.875rem);
-    --space-md: clamp(1rem, 0.875rem + 0.5vw, 1.5rem);
-    --space-lg: clamp(1.5rem, 1.25rem + 1vw, 2.5rem);
-    --space-xl: clamp(2rem, 1.5rem + 2vw, 4rem);
-    --radius-full: 9999px;
-    --ease-out: cubic-bezier(0, 0, 0.2, 1);
-    --duration-fast: 150ms;
-    --duration-normal: 250ms;
-  }
-}
+/* tokens provided by https://design.seantippen.com/tokens.css */
 
 @layer base {
   html { scroll-behavior: smooth; }
@@ -259,7 +215,7 @@
     transition: all var(--duration-fast) var(--ease-out);
   }
   .period-btn:hover { color: var(--color-text); border-color: var(--color-border-emphasis); }
-  .period-btn.active { background: var(--color-accent); color: #000; border-color: var(--color-accent); }
+  .period-btn.active { background: var(--color-accent); color: var(--color-bg); border-color: var(--color-accent); }
 
   .campaign-select {
     appearance: none; -webkit-appearance: none;
@@ -731,7 +687,7 @@ function renderZipBoundaries(gj) {
     style: function(feature) {
       const zip = feature.properties.ZCTA5CE20 || feature.properties.ZCTA5CE10 || feature.properties.zip;
       const count = zipCounts[zip] || 0;
-      if (count === 0) return { fillOpacity: 0.02, weight: 1, color: 'rgba(255,255,255,0.15)', opacity: 0.3, fillColor: '#fff' };
+      if (count === 0) return { fillOpacity: 0.02, weight: 1, color: tok('--color-border-emphasis'), opacity: 0.3, fillColor: tok('--color-text') };
       const intensity = Math.min(count / maxCount, 1);
       return { fillColor: accentColor, fillOpacity: 0.08 + intensity * 0.35, weight: 1.5, color: accentColor, opacity: 0.4 + intensity * 0.4 };
     },
