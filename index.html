@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 <style>
 @layer reset, tokens, base, layout, components;
 
@@ -431,6 +431,21 @@ let map = null;
 let mapMarkers = [];
 let rawData = null;
 let filterSlug = new URLSearchParams(window.location.search).get('slug') || '';
+let refreshInterval = null;
+
+// Sanitize user-facing text to prevent XSS when injecting into innerHTML
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Validate that a URL is safe to use as an href (only http/https)
+function safeUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? url : '#';
+  } catch (e) { return '#'; }
+}
 
 // tok() — read CSS custom property at runtime
 const _style = getComputedStyle(document.documentElement);
@@ -438,6 +453,16 @@ const tok = name => _style.getPropertyValue(name).trim();
 
 // Chart palette from design system tokens
 const COLORS = [tok('--green'), tok('--blue'), tok('--amber'), tok('--red'), tok('--purple'), tok('--cyan'), tok('--yellow'), tok('--orange')];
+
+// Return a semi-transparent version of a hex color for Chart.js fills
+// Chart.js does not support CSS color-mix() — use hex+alpha notation instead
+function colorAlpha(hex, alpha) {
+  hex = hex.trim();
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
 
 // Chart.js defaults
 Chart.defaults.color = tok('--color-text-muted');
@@ -505,6 +530,7 @@ async function loadData() {
   try {
     const url = currentDays > 0 ? API_BASE + '?days=' + currentDays : API_BASE;
     const res = await fetch(url);
+    if (!res.ok) throw new Error('API returned ' + res.status);
     rawData = await res.json();
     populateCampaignSelect();
     data = applySlugFilter(rawData);
@@ -546,7 +572,7 @@ function renderKPIs() {
     '<div class="kpi-card"><div class="kpi-label">Total Scans</div><div class="kpi-value" style="color:' + tok('--color-accent') + '">' + totalScans + '</div><div class="kpi-sub">' + (currentDays > 0 ? 'Last ' + currentDays + ' days' : 'All time') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Active Links</div><div class="kpi-value" style="color:' + tok('--color-info') + '">' + uniqueLinks + '</div><div class="kpi-sub">' + dest.length + ' total destinations</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">Top Performer</div><div class="kpi-value" style="color:' + tok('--color-warning') + '">' + (topLink ? topLink.total : 0) + '</div><div class="kpi-sub">' + (topLink ? (destMap[topLink.slug] || topLink.slug) : 'N/A') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">Last Scan</div><div class="kpi-value" style="font-size:1.1rem;color:' + tok('--color-text') + '">' + lastScan + '</div><div class="kpi-sub">' + (data.recent.length > 0 ? data.recent[0].city + ', ' + data.recent[0].region : '') + '</div></div>';
+    '<div class="kpi-card"><div class="kpi-label">Last Scan</div><div class="kpi-value" style="font-size:1.1rem;color:' + tok('--color-text') + '">' + lastScan + '</div><div class="kpi-sub">' + (data.recent.length > 0 ? esc(data.recent[0].city || 'Unknown') + (data.recent[0].region ? ', ' + esc(data.recent[0].region) : '') : '') + '</div></div>';
 }
 
 // Doughnut chart
@@ -577,7 +603,7 @@ function renderDailyMini() {
     type: 'bar',
     data: {
       labels: days.map(d => formatDate(d)),
-      datasets: [{ data: counts, backgroundColor: 'color-mix(in oklch, ' + tok('--green') + ' 40%, transparent)', borderColor: tok('--green'), borderWidth: 1, borderRadius: 4 }]
+      datasets: [{ data: counts, backgroundColor: colorAlpha(tok('--green'), 0.4), borderColor: tok('--green'), borderWidth: 1, borderRadius: 4 }]
     },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } } } }
   });
@@ -596,7 +622,7 @@ function renderTimeline() {
     label: destMap[slug] || slug,
     data: days.map(day => dailyMap[day + '|' + slug] || 0),
     borderColor: COLORS[i % COLORS.length],
-    backgroundColor: 'color-mix(in oklch, ' + COLORS[i % COLORS.length] + ' 20%, transparent)',
+    backgroundColor: colorAlpha(COLORS[i % COLORS.length], 0.2),
     fill: true, tension: 0.3, pointRadius: 3, pointHoverRadius: 6
   }));
   if (charts.timeline) charts.timeline.destroy();
@@ -622,7 +648,7 @@ function renderWeekday() {
     type: 'bar',
     data: {
       labels: dayNames,
-      datasets: [{ data: counts, backgroundColor: COLORS.map(c => 'color-mix(in oklch, ' + c + ' 40%, transparent)'), borderColor: COLORS, borderWidth: 1, borderRadius: 6 }]
+      datasets: [{ data: counts, backgroundColor: COLORS.map(c => colorAlpha(c, 0.4)), borderColor: COLORS, borderWidth: 1, borderRadius: 6 }]
     },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
@@ -639,7 +665,7 @@ function renderHourly() {
     type: 'bar',
     data: {
       labels,
-      datasets: [{ data: counts, backgroundColor: 'color-mix(in oklch, ' + tok('--blue') + ' 40%, transparent)', borderColor: tok('--blue'), borderWidth: 1, borderRadius: 4 }]
+      datasets: [{ data: counts, backgroundColor: colorAlpha(tok('--blue'), 0.4), borderColor: tok('--blue'), borderWidth: 1, borderRadius: 4 }]
     },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } }, y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
   });
@@ -682,7 +708,7 @@ function renderGeo() {
     const lon = coords.lon + dist * Math.sin(angle);
     const slugColor = COLORS[[...new Set(data.recent.map(r => r.slug))].indexOf(s.slug) % COLORS.length];
     const marker = L.circleMarker([lat, lon], { radius: 5, color: slugColor, fillColor: slugColor, fillOpacity: 0.7, weight: 1.5 }).addTo(map);
-    marker.bindPopup('<strong style="color:' + slugColor + '">' + s.slug + '</strong><br>' + (s.city || 'Unknown') + (s.region ? ', ' + s.region : '') + '<br><span style="opacity:0.7">' + parseUA(s.ua) + '</span><br><span style="opacity:0.5">' + timeAgo(s.ts) + '</span>');
+    marker.bindPopup('<strong style="color:' + slugColor + '">' + esc(s.slug) + '</strong><br>' + esc(s.city || 'Unknown') + (s.region ? ', ' + esc(s.region) : '') + '<br><span style="opacity:0.7">' + esc(parseUA(s.ua)) + '</span><br><span style="opacity:0.5">' + esc(timeAgo(s.ts)) + '</span>');
     mapMarkers.push(marker);
     bounds.push([lat, lon]);
   });
@@ -736,9 +762,10 @@ function renderLinks() {
     '<table class="data-table"><thead><tr><th>Slug</th><th>Label</th><th>Destination</th><th>Status</th><th>Scans</th><th>Last Scan</th></tr></thead><tbody>' +
     (data.destinations || []).map(d => {
       const stats = destMap[d.slug];
-      return '<tr><td><a href="?slug=' + encodeURIComponent(d.slug) + '" class="badge badge-accent" style="text-decoration:none">' + d.slug + '</a></td>' +
-        '<td>' + (d.label || '') + '</td>' +
-        '<td><a href="' + d.url + '" target="_blank" class="link-url">' + d.url + '</a></td>' +
+      const href = safeUrl(d.url);
+      return '<tr><td><a href="?slug=' + encodeURIComponent(d.slug) + '" class="badge badge-accent" style="text-decoration:none">' + esc(d.slug) + '</a></td>' +
+        '<td>' + esc(d.label || '') + '</td>' +
+        '<td><a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" class="link-url">' + esc(d.url) + '</a></td>' +
         '<td><span class="' + (d.active ? 'status-active' : 'status-inactive') + '">' + (d.active ? 'Active' : 'Inactive') + '</span></td>' +
         '<td><span class="badge badge-info">' + (stats ? stats.total : 0) + '</span></td>' +
         '<td class="mono" style="color:' + tok('--color-text-muted') + ';font-size:0.75rem">' + (stats ? timeAgo(stats.last_scan) : 'Never') + '</td></tr>';
@@ -791,8 +818,12 @@ function parseUA(ua) {
 }
 
 // Init
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(loadData, 60000);
+}
 loadData();
-setInterval(loadData, 60000);
+startAutoRefresh();
 </script>
 </body>
 </html>
