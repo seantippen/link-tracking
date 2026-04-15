@@ -488,14 +488,22 @@ async function loadData() {
     const res = await fetch(url);
     if (!res.ok) throw new Error('API returned ' + res.status);
     rawData = await res.json();
+    rawData.summary = rawData.summary || [];
+    rawData.daily = rawData.daily || [];
+    rawData.geo = rawData.geo || [];
+    rawData.zips = rawData.zips || [];
+    rawData.recent = rawData.recent || [];
+    rawData.destinations = rawData.destinations || [];
     populateCampaignSelect();
     data = applySlugFilter(rawData);
     renderAll();
+    const updated = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fails = window._renderFailures || [];
     document.getElementById('last-updated').textContent =
-      'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      fails.length ? updated + ' (partial: ' + fails.join(', ') + ')' : updated;
   } catch (err) {
     console.error('Failed to load data:', err);
-    document.getElementById('last-updated').textContent = 'Error loading data';
+    document.getElementById('last-updated').textContent = 'Error loading data: ' + (err && err.message ? err.message : err);
   }
   btn.textContent = 'Refresh';
   btn.style.pointerEvents = '';
@@ -503,15 +511,16 @@ async function loadData() {
 }
 
 function renderAll() {
-  renderKPIs();
-  renderDoughnut();
-  renderDailyMini();
-  renderTimeline();
-  renderWeekday();
-  renderHourly();
-  renderGeo();
-  renderLinks();
-  renderFeed();
+  const steps = [
+    ['KPIs', renderKPIs], ['Doughnut', renderDoughnut], ['DailyMini', renderDailyMini],
+    ['Timeline', renderTimeline], ['Weekday', renderWeekday], ['Hourly', renderHourly],
+    ['Geo', renderGeo], ['Links', renderLinks], ['Feed', renderFeed]
+  ];
+  const failures = [];
+  for (const [name, fn] of steps) {
+    try { fn(); } catch (e) { console.error('render ' + name + ' failed:', e); failures.push(name); }
+  }
+  window._renderFailures = failures;
 }
 
 // KPI Cards
@@ -647,7 +656,10 @@ function renderGeo() {
   mapMarkers = [];
 
   const geoLookup = {};
-  (data.geo || []).forEach(g => { if (g.lat && g.lon) geoLookup[g.city + '|' + g.region] = { lat: g.lat, lon: g.lon }; });
+  (data.geo || []).forEach(g => {
+    const la = parseFloat(g.lat), lo = parseFloat(g.lon);
+    if (Number.isFinite(la) && Number.isFinite(lo)) geoLookup[g.city + '|' + g.region] = { lat: la, lon: lo };
+  });
 
   const bounds = [];
   const scansByLocation = {};
