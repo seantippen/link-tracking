@@ -723,22 +723,55 @@ function renderZipBoundaries(gj) {
 }
 
 // Links table
+let showAllLinks = false;
 function renderLinks() {
   const destMap = {};
   data.summary.forEach(s => destMap[s.slug] = s);
-  document.getElementById('links-table').innerHTML =
-    '<table class="data-table"><thead><tr><th>Slug</th><th>Label</th><th>Destination</th><th>Status</th><th>Scans</th><th>Last Scan</th></tr></thead><tbody>' +
-    (data.destinations || []).map(d => {
-      const stats = destMap[d.slug];
-      const href = safeUrl(d.url);
-      return '<tr><td><a href="?slug=' + encodeURIComponent(d.slug) + '" class="badge badge-accent" style="text-decoration:none">' + esc(d.slug) + '</a></td>' +
-        '<td>' + esc(d.label || '') + '</td>' +
-        '<td><a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" class="link-url">' + esc(d.url) + '</a></td>' +
-        '<td><span class="' + (d.active ? 'status-active' : 'status-inactive') + '">' + (d.active ? 'Active' : 'Inactive') + '</span></td>' +
-        '<td><span class="badge badge-info">' + (stats ? stats.total : 0) + '</span></td>' +
-        '<td class="mono" style="color:' + tok('--color-text-muted') + ';font-size:0.75rem">' + (stats ? timeAgo(stats.last_scan) : 'Never') + '</td></tr>';
-    }).join('') +
-    '</tbody></table>';
+  const all = (data.destinations || []).slice().sort((a, b) => {
+    const ta = (destMap[a.slug] && destMap[a.slug].total) || 0;
+    const tb = (destMap[b.slug] && destMap[b.slug].total) || 0;
+    if (tb !== ta) return tb - ta;
+    return a.slug.localeCompare(b.slug);
+  });
+  const scanned = all.filter(d => destMap[d.slug]);
+  const unscanned = all.filter(d => !destMap[d.slug]);
+  const rows = showAllLinks ? all : scanned;
+
+  const groups = {};
+  unscanned.forEach(d => {
+    const m = d.slug.match(/^([a-z]+)(?:-|\d)/i);
+    const key = m ? m[1] : 'other';
+    groups[key] = (groups[key] || 0) + 1;
+  });
+  const groupSummary = Object.entries(groups).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => esc(k) + ' (' + n + ')').join(' · ');
+
+  const tableHtml = rows.length === 0
+    ? '<div class="empty-state">No scanned links yet</div>'
+    : '<table class="data-table"><thead><tr><th>Slug</th><th>Label</th><th>Destination</th><th>Status</th><th>Scans</th><th>Last Scan</th></tr></thead><tbody>' +
+      rows.map(d => {
+        const stats = destMap[d.slug];
+        const href = safeUrl(d.url);
+        return '<tr><td><a href="?slug=' + encodeURIComponent(d.slug) + '" class="badge badge-accent" style="text-decoration:none">' + esc(d.slug) + '</a></td>' +
+          '<td>' + esc(d.label || '') + '</td>' +
+          '<td><a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer" class="link-url">' + esc(d.url) + '</a></td>' +
+          '<td><span class="' + (d.active ? 'status-active' : 'status-inactive') + '">' + (d.active ? 'Active' : 'Inactive') + '</span></td>' +
+          '<td><span class="badge badge-info">' + (stats ? stats.total : 0) + '</span></td>' +
+          '<td class="mono" style="color:' + tok('--color-text-muted') + ';font-size:0.75rem">' + (stats ? timeAgo(stats.last_scan) : 'Never') + '</td></tr>';
+      }).join('') +
+      '</tbody></table>';
+
+  const footer = unscanned.length === 0 ? '' :
+    '<div style="margin-top:12px;padding:10px 12px;border:1px dashed ' + tok('--color-border') + ';border-radius:6px;font-size:0.85rem;color:' + tok('--color-text-muted') + ';display:flex;justify-content:space-between;align-items:center;gap:12px">' +
+      '<div>' + unscanned.length + ' unscanned slug' + (unscanned.length !== 1 ? 's' : '') +
+        (groupSummary ? ' · <span class="mono">' + groupSummary + '</span>' : '') + '</div>' +
+      '<button id="toggle-all-links" class="btn btn-outline" style="font-size:0.8rem;padding:4px 10px">' +
+        (showAllLinks ? 'Hide inactive' : 'Show all') + '</button>' +
+    '</div>';
+
+  document.getElementById('links-table').innerHTML = tableHtml + footer;
+  const toggle = document.getElementById('toggle-all-links');
+  if (toggle) toggle.addEventListener('click', () => { showAllLinks = !showAllLinks; renderLinks(); });
 }
 
 // Live feed
